@@ -222,4 +222,4 @@ References consulted for this foundation:
 
 ## License
 
-MIT. Copyright © 2026 tymko.
+MIT.
