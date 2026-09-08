@@ -1,0 +1,11 @@
+#!/usr/bin/python3
+"""Flatpak launcher for the Links source package."""
+
+import sys
+
+sys.path.insert(0, "/app/share/links")
+
+from links.main import main  # noqa: E402
+
+
+raise SystemExit(main())

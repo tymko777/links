@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Links
+Comment=A calm launcher for links, actions, and files
+Exec=links
+Icon=org.tymko.Links
+Terminal=false
+Type=Application
+Categories=Utility;GTK;GNOME;
+Keywords=links;launcher;shortcuts;files;actions;
+StartupNotify=true

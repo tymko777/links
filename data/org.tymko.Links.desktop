@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Links
+Comment=Links organization app
+Exec=links
+Icon=org.tymko.Links
+Terminal=false
+Categories=Utility;Network;
+StartupWMClass=org.tymko.Links

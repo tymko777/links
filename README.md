@@ -1,0 +1,225 @@
+# Links
+
+Links is a native Linux launcher and organizer for the URLs, files, terminal
+commands, and clipboard templates that make up a real workday. It is designed
+to feel at home in GNOME while remaining usable on KDE Plasma, XFCE, and other
+desktop environments.
+
+The application is written in Python 3 with GTK4 and Libadwaita, stores a
+portable JSON document in the XDG configuration directory, and is prepared for
+Flatpak distribution under the app ID `org.tymko.Links`.
+
+> **Current status:** development release `0.2.2`. The core document model,
+> storage, search, all four action types, starter UI, tests, local Flatpak
+> manifest, card/action drag-and-drop sorting, and full folder/card/action
+> editing and deletion are included.
+
+## Product shape
+
+The information architecture is intentionally shallow:
+
+```text
+Links
+└── Folder
+    └── Card
+        ├── URL action
+        ├── File or directory action
+        ├── Terminal command action
+        └── Clipboard template action
+```
+
+Folders and cards are unlimited. Each card supports a maximum of ten actions,
+which keeps the visual surface scannable and makes keyboard navigation
+predictable. Search matches folder names, card titles/descriptions, tags, and
+action titles/descriptions/values.
+
+## Requirements
+
+- Fedora-based Nobara Linux (recommended for development)
+- Python 3.10 or newer
+- GTK 4 and GObject introspection bindings
+- Libadwaita 1
+- `flatpak` and `flatpak-builder` for packaging
+- A terminal emulator for command actions
+
+The runtime dependency names are distribution-specific. On Nobara/Fedora, the
+usual development packages are:
+
+```bash
+sudo dnf install \
+  python3 python3-gobject python3-cairo \
+  gtk4 gtk4-devel libadwaita libadwaita-devel \
+  gobject-introspection flatpak flatpak-builder \
+  gcc pkg-config
+```
+
+If your installation uses a different package name for GObject introspection,
+search for the GTK4/Adwaita introspection packages rather than installing a
+second GTK stack from source.
+
+## Development setup on Nobara
+
+```bash
+git clone https://github.com/tymko/links.git
+cd links
+
+python3 -m venv --system-site-packages .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev,yaml]"
+```
+
+PyGObject is intentionally supplied by the operating system/Flatpak runtime,
+not built as a random pip wheel. Confirm the bindings before launching:
+
+```bash
+python -c "import gi; gi.require_version('Gtk', '4.0'); from gi.repository import Gtk; print(Gtk.get_major_version())"
+```
+
+## Local run
+
+```bash
+source .venv/bin/activate
+python -m links.main
+```
+
+The first run creates starter content in:
+
+```text
+~/.config/links/links.json
+```
+
+`XDG_CONFIG_HOME` is respected, which makes isolated test runs easy:
+
+```bash
+XDG_CONFIG_HOME="$(mktemp -d)" python -m links.main
+```
+
+## Tests and lint
+
+The pure model, search, and storage layers can be tested without a display:
+
+```bash
+python -m unittest discover -s tests -v
+# Optional, if you installed the dev extra:
+python -m pytest -q
+ruff check .
+python -m compileall links tests
+```
+
+The same checks are available as one command:
+
+```bash
+bash scripts/check.sh
+```
+
+For a GTK smoke test, run inside a graphical Nobara session. Wayland is
+preferred; set `GDK_BACKEND=x11` for an explicit X11 smoke test when an X11
+session is available. The app requests both `wayland` and `fallback-x11` in
+Flatpak and leaves backend selection to GTK.
+
+## Flatpak build
+
+Install the GNOME runtime and SDK once:
+
+```bash
+flatpak remote-add --if-not-exists flathub \
+  https://dl.flathub.org/repo/flathub.flatpakrepo
+  flatpak install flathub org.gnome.Sdk//50 org.gnome.Platform//50
+```
+
+Build and install the local manifest:
+
+```bash
+flatpak-builder --user --install --force-clean \
+  builddir flatpak/org.tymko.Links.yml
+flatpak run org.tymko.Links
+```
+
+Build without installing:
+
+```bash
+flatpak-builder --repo=repo --force-clean builddir \
+  flatpak/org.tymko.Links.yml
+flatpak build-bundle repo links.flatpak org.tymko.Links stable
+```
+
+The local manifest uses a `type: dir` source because this repository is being
+developed locally. It copies the application package directly into the
+Flatpak image, so the build does not require pip, PyPI, or network access.
+For Flathub, replace the local source with an immutable Git tag and exact
+commit as described in [`docs/FLATHUB.md`](docs/FLATHUB.md).
+
+## Configuration and import/export
+
+The canonical file is JSON:
+
+```bash
+cat ~/.config/links/links.json
+```
+
+YAML import/export is available when the optional dependency is installed:
+
+```bash
+python -m pip install ".[yaml]"
+```
+
+The storage service writes atomically and validates `schema_version`. Keep
+backups of the file before importing content from another person. The file is
+portable and contains no credentials managed by Links.
+
+## Action behavior
+
+- **URL:** opened by the desktop's default handler through GIO.
+- **File/directory:** `~` is expanded and the URI is opened by the default
+  file manager. A development fallback uses `xdg-open`.
+- **Command:** runs after confirmation in a detected terminal using
+  `bash -lc`. Flatpak command fallback uses `flatpak-spawn --host` and is
+  deliberately called out in [`docs/SECURITY.md`](docs/SECURITY.md).
+- **Clipboard:** copies the exact action value through the GTK clipboard.
+
+Never import a configuration containing commands you have not reviewed.
+
+## Project structure
+
+```text
+.
+├── flatpak/                 # Local Flatpak manifest
+├── links/
+│   ├── main.py              # Adw.Application entry point
+│   ├── models.py            # Domain model and validation
+│   ├── search.py            # Pure search service
+│   ├── storage.py           # XDG JSON/YAML storage
+│   ├── services/            # Action execution boundary
+│   └── ui/                  # GTK4/Libadwaita presentation layer
+├── resources/               # Desktop entry, AppStream, icon
+├── tests/                   # Headless unit tests
+└── docs/                    # Architecture, security, Flathub plan
+```
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the MVVM-style
+separation and the next implementation slice.
+
+## GNOME HIG decisions
+
+The UI uses a single primary window, a header bar, a two-pane folder
+navigation pattern, a search entry, a compact action surface, status pages for
+empty states, and Libadwaita dialogs for confirmation. This follows the GNOME
+preference for focused views and in-window navigation instead of stacking
+secondary windows. Styling is delegated to Adwaita rather than hard-coded
+colors, so light/dark mode, high contrast, and platform scaling remain
+available to the desktop.
+
+References consulted for this foundation:
+
+- [GNOME Human Interface Guidelines](https://developer.gnome.org/hig/)
+- [GNOME navigation guidance](https://developer.gnome.org/hig/guidelines/navigation.html)
+- [PyGObject Libadwaita application tutorial](https://gnome.pages.gitlab.gnome.org/pygobject/tutorials/libadwaita/application.html)
+- [Flatpak manifests](https://docs.flatpak.org/en/latest/manifests.html)
+- [Flathub requirements](https://docs.flathub.org/docs/for-app-authors/requirements)
+- [Flathub AppStream guidelines](https://docs.flathub.org/docs/for-app-authors/metainfo-guidelines)
+- [GIO AppInfo default application API](https://docs.gtk.org/gio/iface.AppInfo.html)
+
+## License
+
+MIT. Copyright © 2026 tymko.

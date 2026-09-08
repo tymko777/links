@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.tymko.Links</id>
+  <name>Links</name>
+  <summary>A calm launcher for links, actions, and files</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="tymko">
+    <name>tymko</name>
+  </developer>
+  <description>
+    <p>
+      Links organizes everyday URLs, files, terminal commands, and clipboard
+      templates into searchable folders and cards.
+    </p>
+    <p>
+      It is built with Python, GTK4, and Libadwaita for a native experience
+      across GNOME, KDE Plasma, XFCE, Wayland, and X11.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.tymko.Links.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <url type="homepage">https://github.com/tymko/links</url>
+  <url type="bugtracker">https://github.com/tymko/links/issues</url>
+  <releases>
+    <release version="0.2.2" date="2026-09-06">
+      <description>
+        <p>Initial public development release.</p>
+      </description>
+    </release>
+  </releases>
+  <update_contact>tymko</update_contact>
+</component>

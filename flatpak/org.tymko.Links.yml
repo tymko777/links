@@ -1,0 +1,26 @@
+app-id: org.tymko.Links
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: links
+finish-args:
+  # Default app and file launching through desktop portals/GIO.
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  # Needed only for the command action fallback to flatpak-spawn --host.
+  # Remove this permission if command actions are disabled in your build.
+  - --talk-name=org.freedesktop.Flatpak
+modules:
+  - name: links
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 resources/links /app/bin/links
+      - install -Dm644 resources/org.tymko.Links.desktop /app/share/applications/org.tymko.Links.desktop
+      - install -Dm644 resources/org.tymko.Links.metainfo.xml /app/share/metainfo/org.tymko.Links.metainfo.xml
+      - install -Dm644 resources/icons/hicolor/scalable/apps/org.tymko.Links.svg /app/share/icons/hicolor/scalable/apps/org.tymko.Links.svg
+      - mkdir -p /app/share/links
+      - cp -a links /app/share/links/
+    sources:
+      - type: dir
+        path: ..
