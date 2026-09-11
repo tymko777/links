@@ -18,6 +18,18 @@
       across GNOME, KDE Plasma, XFCE, Wayland, and X11.
     </p>
   </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/tymko777/links/main/docs/screenshots/main.png</image>
+      <caption>Main application window showing searchable cards and folders</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/tymko777/links/main/docs/screenshots/search.png</image>
+      <caption>All-card search in action</caption>
+    </screenshot>
+  </screenshots>
+
   <launchable type="desktop-id">org.tymko.Links.desktop</launchable>
   <content_rating type="oars-1.1"/>
   <url type="homepage">https://github.com/tymko777/links</url>
