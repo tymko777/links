@@ -36,7 +36,7 @@ class LinksApplication(Adw.Application):
             application_name="Links",
             application_icon="org.tymko.Links",
             developer_name="tymko",
-            version="0.2.2",
+            version="0.5.0",
             comments="A calm launcher for links, actions, and files.",
             website="https://github.com/tymko777/links",
             issue_url="https://github.com/tymko777/links/issues",

@@ -69,11 +69,15 @@ class CardWidget(Gtk.Frame):
     def __init__(
         self,
         card: Card,
+        folder_title: str | None,
         on_action: Callable[[Action], None],
+        on_toggle_favorite: Callable[[Card], None],
         on_add_action: Callable[[Card], None],
         on_edit_card: Callable[[Card], None],
+        on_duplicate_card: Callable[[Card], None],
         on_delete_card: Callable[[Card], None],
         on_edit_action: Callable[[Card, Action], None],
+        on_duplicate_action: Callable[[Card, Action], None],
         on_delete_action: Callable[[Card, Action], None],
         on_move_card: Callable[[str, str], bool],
         on_move_action: Callable[[str, str, str], bool],
@@ -95,12 +99,26 @@ class CardWidget(Gtk.Frame):
         heading.set_hexpand(True)
         heading.add_css_class("heading")
         heading_box.append(heading)
+        heading_box.append(
+            icon_button(
+                "starred-symbolic" if card.favorite else "non-starred-symbolic",
+                "Remove from favorites" if card.favorite else "Add to favorites",
+                lambda: on_toggle_favorite(card),
+            )
+        )
         if editable:
             heading_box.append(
                 icon_button(
                     "document-edit-symbolic",
                     "Edit card",
                     lambda: on_edit_card(card),
+                )
+            )
+            heading_box.append(
+                icon_button(
+                    "edit-copy-symbolic",
+                    "Duplicate card",
+                    lambda: on_duplicate_card(card),
                 )
             )
             heading_box.append(
@@ -112,11 +130,25 @@ class CardWidget(Gtk.Frame):
             )
         body.append(heading_box)
 
+        if folder_title:
+            location = Gtk.Label(label=folder_title, xalign=0)
+            location.add_css_class("dim-label")
+            location.add_css_class("caption")
+            body.append(location)
+
         if card.description:
             description = Gtk.Label(label=card.description, xalign=0)
             description.set_wrap(True)
             description.add_css_class("dim-label")
             body.append(description)
+
+        stats = Gtk.Label(
+            label=f"{len(card.actions)} actions · {len(card.tags)} tags",
+            xalign=0,
+        )
+        stats.add_css_class("dim-label")
+        stats.add_css_class("caption")
+        body.append(stats)
 
         actions_box = Gtk.FlowBox()
         actions_box.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -143,6 +175,15 @@ class CardWidget(Gtk.Frame):
                         lambda action=action: on_edit_action(card, action),
                     )
                 )
+                duplicate_button = icon_button(
+                    "edit-copy-symbolic",
+                    "Duplicate action",
+                    lambda action=action: on_duplicate_action(card, action),
+                )
+                duplicate_button.set_sensitive(
+                    len(card.actions) < MAX_ACTIONS_PER_CARD
+                )
+                action_line.append(duplicate_button)
                 action_line.append(
                     icon_button(
                         "user-trash-symbolic",

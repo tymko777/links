@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0 — 2026-09-11
+
+- Added an All cards view with cross-folder search and folder labels.
+- Added the headless `links-cli` command for listing and searching configurations.
+
+## 0.4.0 — 2026-09-11
+
+- Added favorite cards and a favorite-only filter for the selected folder.
+- Added automatic `.bak` snapshots before every saved change.
+- Added a menu action to restore the last valid backup.
+- Added card statistics showing action and tag counts.
+
+## 0.3.0 — 2026-09-07
+
+- Added keyboard shortcuts for search, creating folders/cards, importing, and exporting.
+- Added duplicate actions for cards and individual actions in edit mode.
+- Updated project links to `github.com/tymko777/links`.
+
 ## 0.2.2 — 2026-09-07
 
 - Fixed `python -m links.main` so it actually enters the GTK application loop.

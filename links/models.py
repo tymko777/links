@@ -51,6 +51,17 @@ class Action:
                 )
         return errors
 
+    def clone(self) -> Action:
+        """Return an independent copy with a new stable ID."""
+
+        return Action(
+            title=self.title,
+            action_type=self.action_type,
+            value=self.value,
+            description=self.description,
+            icon=self.icon,
+        )
+
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Action:
         """Build an action while tolerating older/missing fields."""
@@ -74,6 +85,7 @@ class Card:
     tags: list[str] = field(default_factory=list)
     actions: list[Action] = field(default_factory=list)
     id: str = field(default_factory=lambda: new_id("card"))
+    favorite: bool = False
 
     def validate(self) -> list[str]:
         errors: list[str] = []
@@ -94,6 +106,17 @@ class Card:
             )
         self.actions.append(action)
 
+    def clone(self) -> Card:
+        """Return an independent card copy with fresh nested action IDs."""
+
+        return Card(
+            title=f"{self.title} (copy)",
+            description=self.description,
+            tags=list(self.tags),
+            actions=[action.clone() for action in self.actions],
+            favorite=self.favorite,
+        )
+
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> Card:
         return cls(
@@ -106,6 +129,7 @@ class Card:
                 for item in raw.get("actions", [])
                 if isinstance(item, dict)
             ],
+            favorite=bool(raw.get("favorite", False)),
         )
 
 

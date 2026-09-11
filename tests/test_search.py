@@ -13,6 +13,7 @@ class SearchTests(unittest.TestCase):
                     cards=[
                         Card(
                             title="Release",
+                            favorite=True,
                             tags=["shipping"],
                             actions=[
                                 Action(
@@ -44,6 +45,14 @@ class SearchTests(unittest.TestCase):
         folder.cards.append(Card(title="Planning"))
 
         matching = cards_matching(self.document, folder, "release")
+
+        self.assertEqual([card.title for card in matching], ["Release"])
+
+    def test_favorites_filter_keeps_only_favorite_cards(self) -> None:
+        folder = self.document.folders[0]
+        folder.cards.append(Card(title="Planning"))
+
+        matching = cards_matching(self.document, folder, "", favorites_only=True)
 
         self.assertEqual([card.title for card in matching], ["Release"])
 

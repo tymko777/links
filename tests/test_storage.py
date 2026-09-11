@@ -25,6 +25,18 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(loaded, original)
         self.assertEqual(store.path, Path(directory) / "links" / "links.json")
 
+    def test_save_keeps_previous_document_in_backup(self) -> None:
+        with TemporaryDirectory() as directory:
+            store = ConfigStore(Path(directory))
+            original = LinksDocument(folders=[Folder(title="Original")])
+            changed = LinksDocument(folders=[Folder(title="Changed")])
+
+            store.save(original)
+            store.save(changed)
+            backup = store.load_backup()
+
+        self.assertEqual(backup, original)
+
     def test_missing_file_returns_starter_document(self) -> None:
         with TemporaryDirectory() as directory:
             document = ConfigStore(Path(directory)).load()

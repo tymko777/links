@@ -130,7 +130,7 @@ informed decision.
 - Configuration is human-readable and backup-friendly.
 - All user-visible copy is English in the initial release.
 
-## 7. Acceptance checklist for 0.2.2
+## 7. Acceptance checklist for 0.5.0
 
 - [x] `python -m compileall links tests` succeeds.
 - [x] Model validation rejects more than ten actions.

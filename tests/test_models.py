@@ -62,6 +62,28 @@ class ModelTests(unittest.TestCase):
             any("Duplicate object ID" in error for error in document.validate())
         )
 
+    def test_card_clone_has_fresh_nested_ids(self) -> None:
+        original = Card(
+            title="Deploy",
+            tags=["release"],
+            actions=[
+                Action(
+                    title="Dashboard",
+                    action_type="url",
+                    value="https://example.com",
+                )
+            ],
+        )
+
+        clone = original.clone()
+
+        self.assertEqual(clone.title, "Deploy (copy)")
+        self.assertNotEqual(clone.id, original.id)
+        self.assertNotEqual(clone.actions[0].id, original.actions[0].id)
+        self.assertEqual(clone.tags, original.tags)
+        self.assertEqual(clone.actions[0].value, original.actions[0].value)
+        self.assertEqual(clone.validate(), [])
+
     def test_unsafe_url_is_rejected_by_model_validation(self) -> None:
         action = Action(
             title="Unsafe",

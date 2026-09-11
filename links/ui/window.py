@@ -10,9 +10,9 @@ gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from ..models import Action, Card, Folder, LinksDocument
+from ..models import MAX_ACTIONS_PER_CARD, Action, Card, Folder, LinksDocument
 from ..operations import move_by_id
-from ..search import cards_matching
+from ..search import cards_matching, cards_matching_all
 from ..services.action_runner import ActionError, ActionRunner
 from ..storage import ConfigStore, StorageError
 from .dialogs import ask_action, ask_card, ask_text, confirm
@@ -33,6 +33,8 @@ class LinksWindow(Adw.ApplicationWindow):
             self.document.folders[0] if self.document.folders else None
         )
         self.search_query = ""
+        self.favorites_only = False
+        self.show_all_folders = False
         self.edit_mode = False
         self._install_actions()
 
@@ -61,9 +63,16 @@ class LinksWindow(Adw.ApplicationWindow):
         self.search.connect("search-changed", self._on_search_changed)
         header.pack_start(self.search)
 
+        self.favorites_button = Gtk.ToggleButton.new()
+        self.favorites_button.set_icon_name("starred-symbolic")
+        self.favorites_button.set_tooltip_text("Show favorite cards only")
+        self.favorites_button.connect("toggled", self._on_favorites_toggled)
+        header.pack_start(self.favorites_button)
+
         menu = Gio.Menu()
         menu.append("Import…", "win.import")
         menu.append("Export…", "win.export")
+        menu.append("Restore last backup", "win.restore-backup")
         menu.append("About Links", "app.about")
         menu_button = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu)
         menu_button.set_tooltip_text("Application menu")
@@ -89,6 +98,13 @@ class LinksWindow(Adw.ApplicationWindow):
         self.folder_list = Gtk.ListBox()
         self.folder_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
         self.folder_list.add_css_class("boxed-list")
+        all_cards = Adw.ActionRow(
+            title="All cards",
+            subtitle=f"{sum(len(folder.cards) for folder in self.document.folders)} cards",
+        )
+        all_cards.add_prefix(Gtk.Image.new_from_icon_name("view-grid-symbolic"))
+        all_cards.connect("activated", lambda _row: self._select_all_folders())
+        self.folder_list.append(all_cards)
         box.append(self.folder_list)
 
         add_folder = Gtk.Button(label="New folder")
@@ -108,10 +124,69 @@ class LinksWindow(Adw.ApplicationWindow):
         for name, callback in (
             ("import", self._import_document),
             ("export", self._export_document),
+            ("restore-backup", self._restore_backup_action),
+            ("search", self._focus_search),
+            ("new-card", self._activate_new_card),
+            ("new-folder", self._activate_new_folder),
         ):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", callback)
             self.add_action(action)
+        application = self.get_application()
+        if application is not None:
+            application.set_accels_for_action("win.search", ["<Primary>k"])
+            application.set_accels_for_action("win.new-card", ["<Primary>n"])
+            application.set_accels_for_action(
+                "win.new-folder", ["<Primary><Shift>n"]
+            )
+            application.set_accels_for_action("win.import", ["<Primary>i"])
+            application.set_accels_for_action(
+                "win.export", ["<Primary><Shift>e"]
+            )
+
+    def _focus_search(
+        self, _action: Gio.SimpleAction, _parameter: None
+    ) -> None:
+        self.search.grab_focus()
+        self.search.select_region(0, -1)
+
+    def _activate_new_card(
+        self, _action: Gio.SimpleAction, _parameter: None
+    ) -> None:
+        self._on_add_card(None)
+
+    def _activate_new_folder(
+        self, _action: Gio.SimpleAction, _parameter: None
+    ) -> None:
+        self._on_add_folder(None)
+
+    def _restore_backup_action(
+        self, _action: Gio.SimpleAction, _parameter: None
+    ) -> None:
+        if not self.store.backup_path.exists():
+            self._notify("No backup is available yet.")
+            return
+        confirm(
+            self,
+            "Restore the last backup?",
+            "Your current configuration will be replaced by the previous saved version.",
+            self._restore_backup,
+            continue_label="Restore backup",
+        )
+
+    def _restore_backup(self) -> None:
+        try:
+            self.document = self.store.load_backup()
+            self.store.save(self.document, create_backup=False)
+        except StorageError as error:
+            self._notify(str(error))
+            return
+        self.selected_folder = (
+            self.document.folders[0] if self.document.folders else None
+        )
+        self._refresh_sidebar()
+        self._refresh_content()
+        self._notify("Backup restored")
 
     def _load_document(self) -> LinksDocument:
         try:
@@ -152,20 +227,42 @@ class LinksWindow(Adw.ApplicationWindow):
             self.content_scroller.set_child(body)
             return
 
-        title = Gtk.Label(label=self.selected_folder.title, xalign=0)
+        title = Gtk.Label(
+            label="All cards" if self.show_all_folders else self.selected_folder.title,
+            xalign=0,
+        )
         title.add_css_class("title-1")
         body.append(title)
 
         query = self.search_query.strip()
-        visible_cards = cards_matching(self.document, self.selected_folder, query)
+        if self.show_all_folders:
+            visible_cards = cards_matching_all(
+                self.document,
+                query,
+                self.favorites_only,
+            )
+        else:
+            visible_cards = [
+                (self.selected_folder, card)
+                for card in cards_matching(
+                    self.document,
+                    self.selected_folder,
+                    query,
+                    self.favorites_only,
+                )
+            ]
 
         if not visible_cards:
             empty = Adw.StatusPage(
-                title="Nothing here yet" if not query else "No matches",
+                title=(
+                    "Nothing here yet"
+                    if not query and not self.favorites_only
+                    else "No matches"
+                ),
                 description=(
                     "Add a card from the button below."
-                    if not query
-                    else "Try a different title, description, or tag."
+                    if not query and not self.favorites_only
+                    else "Try a different title, description, tag, or folder."
                 ),
                 icon_name="edit-find-symbolic",
             )
@@ -176,15 +273,19 @@ class LinksWindow(Adw.ApplicationWindow):
             grid.set_homogeneous(True)
             grid.set_row_spacing(12)
             grid.set_column_spacing(12)
-            for card in visible_cards:
+            for folder, card in visible_cards:
                 grid.insert(
                     CardWidget(
                         card,
+                        None if not self.show_all_folders else folder.title,
                         self._run_action,
+                        self._on_toggle_favorite,
                         self._on_add_action,
                         self._on_edit_card,
+                        self._on_duplicate_card,
                         self._on_delete_card,
                         self._on_edit_action,
+                        self._on_duplicate_action,
                         self._on_delete_action,
                         self._move_card,
                         self._move_action,
@@ -203,11 +304,32 @@ class LinksWindow(Adw.ApplicationWindow):
 
     def _select_folder(self, folder: Folder) -> None:
         self.selected_folder = folder
+        self.show_all_folders = False
+        self._refresh_content()
+
+    def _select_all_folders(self) -> None:
+        self.show_all_folders = True
         self._refresh_content()
 
     def _on_search_changed(self, entry: Gtk.SearchEntry) -> None:
         self.search_query = entry.get_text()
         self._refresh_content()
+
+    def _on_favorites_toggled(self, button: Gtk.ToggleButton) -> None:
+        self.favorites_only = button.get_active()
+        self._refresh_content()
+        self._notify(
+            "Showing favorite cards only"
+            if self.favorites_only
+            else "Showing all cards"
+        )
+
+    def _on_toggle_favorite(self, card: Card) -> None:
+        card.favorite = not card.favorite
+        self._save_and_refresh()
+        self._notify(
+            "Added to favorites" if card.favorite else "Removed from favorites"
+        )
 
     def _on_edit_toggled(self, button: Gtk.ToggleButton) -> None:
         self.edit_mode = button.get_active()
@@ -219,7 +341,7 @@ class LinksWindow(Adw.ApplicationWindow):
             else "Edit mode disabled."
         )
 
-    def _on_add_folder(self, _button: Gtk.Button) -> None:
+    def _on_add_folder(self, _button: Gtk.Button | None) -> None:
         ask_text(self, "New folder", "Folder name", self._create_folder)
 
     def _create_folder(self, title: str) -> None:
@@ -228,7 +350,7 @@ class LinksWindow(Adw.ApplicationWindow):
         self.selected_folder = folder
         self._save_and_refresh()
 
-    def _on_add_card(self, _button: Gtk.Button) -> None:
+    def _on_add_card(self, _button: Gtk.Button | None) -> None:
         if not self.selected_folder:
             return
         ask_card(self, self._create_card)
@@ -341,9 +463,18 @@ class LinksWindow(Adw.ApplicationWindow):
         )
 
     def _delete_card(self, card: Card) -> None:
-        if self.selected_folder:
-            self.selected_folder.cards.remove(card)
+        folder = self._folder_for_card(card)
+        if folder is not None:
+            folder.cards.remove(card)
             self._save_and_refresh()
+
+    def _on_duplicate_card(self, card: Card) -> None:
+        folder = self._folder_for_card(card)
+        if folder is not None:
+            index = folder.cards.index(card)
+            folder.cards.insert(index + 1, card.clone())
+            self._save_and_refresh()
+            self._notify("Card duplicated")
 
     def _on_edit_action(self, card: Card, action: Action) -> None:
         ask_action(
@@ -368,6 +499,15 @@ class LinksWindow(Adw.ApplicationWindow):
             continue_label="Delete action",
         )
 
+    def _on_duplicate_action(self, card: Card, action: Action) -> None:
+        if len(card.actions) >= MAX_ACTIONS_PER_CARD:
+            self._notify("This card already has the maximum number of actions.")
+            return
+        index = card.actions.index(action)
+        card.actions.insert(index + 1, action.clone())
+        self._save_and_refresh()
+        self._notify("Action duplicated")
+
     def _delete_action(self, card: Card, action: Action) -> None:
         card.actions.remove(action)
         self._save_and_refresh()
@@ -382,10 +522,11 @@ class LinksWindow(Adw.ApplicationWindow):
         }.get(action_type, "emblem-symbolic-link")
 
     def _move_card(self, source_id: str, target_id: str) -> bool:
-        if not self.selected_folder or source_id == target_id:
+        folder = self._folder_for_card_id(source_id)
+        if folder is None or source_id == target_id:
             return False
         if not move_by_id(
-            self.selected_folder.cards,
+            folder.cards,
             source_id,
             target_id,
             lambda card: card.id,
@@ -393,6 +534,19 @@ class LinksWindow(Adw.ApplicationWindow):
             return False
         self._save_and_refresh()
         return True
+
+    def _folder_for_card(self, card: Card) -> Folder | None:
+        return self._folder_for_card_id(card.id)
+
+    def _folder_for_card_id(self, card_id: str) -> Folder | None:
+        return next(
+            (
+                folder
+                for folder in self.document.folders
+                if any(card.id == card_id for card in folder.cards)
+            ),
+            None,
+        )
 
     def _move_action(self, card_id: str, source_id: str, target_id: str) -> bool:
         card = next(

@@ -1,0 +1,3 @@
+[console_scripts]
+links = links.main:main
+links-cli = links.cli:main

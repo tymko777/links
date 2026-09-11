@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "links"
-version = "0.2.2"
+version = "0.5.0"
 description = "A calm GNOME-native launcher for links, actions, and files."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,7 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [project.scripts]
 links = "links.main:main"
+links-cli = "links.cli:main"
 
 [tool.setuptools]
 packages = ["links", "links.services", "links.ui"]

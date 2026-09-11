@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ class ConfigStore:
         )
         self.directory = root / APP_DIR_NAME
         self.path = self.directory / DEFAULT_FILE_NAME
+        self.backup_path = self.directory / f"{DEFAULT_FILE_NAME}.bak"
 
     def load(self) -> LinksDocument:
         if not self.path.exists():
@@ -46,14 +48,42 @@ class ConfigStore:
             raise StorageError("; ".join(errors))
         return document
 
-    def save(self, document: LinksDocument) -> None:
+    def save(self, document: LinksDocument, *, create_backup: bool = True) -> None:
         errors = document.validate()
         if errors:
             raise StorageError("; ".join(errors))
 
         self.directory.mkdir(parents=True, exist_ok=True)
+        if create_backup and self.path.exists():
+            try:
+                shutil.copy2(self.path, self.backup_path)
+            except OSError as error:
+                raise StorageError(
+                    f"Could not create backup {self.backup_path}: {error}"
+                ) from error
         payload = json.dumps(document.to_dict(), indent=2, ensure_ascii=False)
         self._atomic_write(self.path, payload + "\n")
+
+    def load_backup(self) -> LinksDocument:
+        """Load the last configuration saved before a change."""
+
+        if not self.backup_path.exists():
+            raise StorageError("No backup is available yet.")
+        try:
+            with self.backup_path.open("r", encoding="utf-8") as handle:
+                raw = json.load(handle)
+            if not isinstance(raw, dict):
+                raise StorageError("The backup root must be an object.")
+            document = LinksDocument.from_dict(raw)
+        except StorageError:
+            raise
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+            raise StorageError(f"Could not read {self.backup_path}: {error}") from error
+
+        errors = document.validate()
+        if errors:
+            raise StorageError("; ".join(errors))
+        return document
 
     def export_document(self, document: LinksDocument, destination: Path) -> None:
         """Export JSON or YAML based on the destination suffix."""
